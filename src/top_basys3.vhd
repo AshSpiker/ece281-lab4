@@ -25,7 +25,13 @@ end top_basys3;
 architecture top_basys3_arch of top_basys3 is
 
     -- signal declarations
-    
+    signal w_clk : std_logic;
+    signal w_TDM_clk : std_logic;
+    signal w_4bit : std_logic_vector(3 downto 0);
+    signal w_LandU : std_logic;
+    signal w_RandU : std_logic;
+    signal w_D0 : std_logic_vector(3 downto 0);
+    signal w_D2 : std_logic_vector(3 downto 0);
   
 	-- component declarations
     component sevenseg_decoder is
@@ -69,13 +75,76 @@ architecture top_basys3_arch of top_basys3 is
     end component clock_divider;
 	
 begin
+	w_LandU <= (btnL or btnU); -- creating wires that connects my buttons
+	w_RandU <= (btnR or btnU);
+	
+	-- hard coding anode outputs, active low
+	--an(3) <= '1'; -- not active
+	--an(2) <= '0'; -- not active
+	--an(1) <= '1'; -- not active
+	--an(0) <= '0'; -- active
+	
+	
 	-- PORT MAPS ----------------------------------------
+    	sevenseg_decoder_inst : sevenseg_decoder
+    	port map(
+    	i_Hex   => w_4bit,
+    	o_seg_n => seg
+    	);
+    	
+    	
+    	elevator_controller_one_fsm_inst : elevator_controller_fsm
+    	port map(
+    	i_clk => w_clk,
+    	i_reset => w_RandU,
+    	is_stopped => sw(0),
+    	go_up_down => sw(1),
+    	o_floor => w_D0
+    	);
+    	
+    	elevator_controller_two_fsm_inst : elevator_controller_fsm
+    	port map(
+    	i_clk => w_clk,
+    	i_reset => w_RandU,
+    	is_stopped => sw(14),
+    	go_up_down => sw(15),
+    	o_floor => w_D2
+    	);
+    	
+    	clock_divider_inst : clock_divider
+    	generic map ( k_DIV => 50000000 )
+    	port map(
+    	i_clk => clk,
+    	i_reset => w_LandU,
+    	o_clk => w_clk
+    	);
+    	
+    	clock_divider_TDM_inst : clock_divider
+    	generic map(k_DIV => 208333)
+    	port map(
+    	i_clk => clk,
+    	i_reset => w_LandU,
+    	o_clk => w_TDM_clk
+    	);
+    	
+    	TDM4_inst : TDM4
+    	port map(
+    	i_clk => w_TDM_clk,
+    	i_reset => w_LandU,
+        i_D3 	=>	"1111",
+        i_D2 	=>  w_D2,
+        i_D1 	=>	"1111",
+        i_D0 	=>	w_D0,
+        o_data	=>	w_4bit,
+        o_sel	=>	an
+    	);
     	
 	
 	-- CONCURRENT STATEMENTS ----------------------------
 	
 	-- LED 15 gets the FSM slow clock signal. The rest are grounded.
-	
+	led(14 downto 0) <= (others => '0');
+	led(15) <= w_clk;
 	-- leave unused switches UNCONNECTED. Ignore any warnings this causes.
 	
 	-- reset signals
